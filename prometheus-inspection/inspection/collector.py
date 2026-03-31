@@ -180,16 +180,17 @@ class PrometheusCollector:
     
     def collect_rule_evaluation_metrics(self) -> Dict[str, Any]:
         """
-        收集规则评估相关指标
+        收集规则评估相关指标（包括所有 alert_rules 的详细信息）
         
         Returns:
             规则评估指标字典
         """
         metrics = {}
         
-        # 规则组数量
+        # 获取所有规则组及其详细规则信息
         rules_data = self.get_rules()
         groups = rules_data.get('groups', [])
+        metrics['groups'] = groups  # 包含所有规则的详细信息（状态、类型等）
         metrics['rule_groups_count'] = len(groups)
         
         # 总规则数
