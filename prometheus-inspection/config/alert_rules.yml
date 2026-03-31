@@ -1,0 +1,138 @@
+# Prometheus 告警规则
+
+groups:
+  - name: prometheus_alerts
+    interval: 30s
+    rules:
+      # Prometheus 目标下线告警
+      - alert: PrometheusTargetDown
+        expr: up == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Prometheus 目标下线 (实例 {{ $labels.instance }})"
+          description: "目标 {{ $labels.job }}/{{ $labels.instance }} 已经下线超过 1 分钟"
+
+      # Prometheus 配置重载失败
+      - alert: PrometheusConfigReloadFailed
+        expr: prometheus_config_last_reload_successful != 1
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Prometheus 配置重载失败"
+          description: "Prometheus 配置重载失败，请检查配置文件"
+
+      # 抓取失败率高
+      - alert: PrometheusScrapeFailureRateHigh
+        expr: |
+          (
+            rate(prometheus_target_scrapes_exceeded_sample_limit_total[5m]) +
+            rate(prometheus_target_scrapes_sample_duplicate_timestamp_total[5m]) +
+            rate(prometheus_target_scrapes_sample_out_of_bounds_total[5m]) +
+            rate(prometheus_target_scrapes_sample_out_of_order_total[5m])
+          ) / rate(prometheus_target_scrapes_total[5m]) > 0.05
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Prometheus 抓取失败率过高"
+          description: "抓取失败率超过 5%"
+
+      # 评估队列延迟
+      - alert: PrometheusRuleEvaluationSlow
+        expr: prometheus_rule_group_last_duration_seconds > prometheus_rule_group_interval_seconds
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Prometheus 规则评估缓慢"
+          description: "规则组 {{ $labels.rule_group }} 评估时间超过间隔时间"
+
+      # TSDB 写入失败
+      - alert: PrometheusTSDBCompactionsFailed
+        expr: increase(prometheus_tsdb_compactions_failed_total[1h]) > 0
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Prometheus TSDB 压缩失败"
+          description: "TSDB 压缩失败次数：{{ $value }}"
+
+      # 内存使用过高
+      - alert: PrometheusHighMemoryUsage
+        expr: |
+          process_resident_memory_bytes{job="prometheus"} > 2 * 1024 * 1024 * 1024
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Prometheus 内存使用过高"
+          description: "Prometheus 进程内存使用超过 2GB"
+
+      # 查询延迟高
+      - alert: PrometheusQueryLatencyHigh
+        expr: histogram_quantile(0.99, rate(prometheus_http_request_duration_seconds_bucket[5m])) > 5
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Prometheus 查询延迟过高"
+          description: "99% 的查询延迟超过 5 秒"
+
+  - name: node_alerts
+    interval: 30s
+    rules:
+      # Node 节点下线
+      - alert: NodeDown
+        expr: up{job="node"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Node 节点下线 (实例 {{ $labels.instance }})"
+          description: "节点 {{ $labels.instance }} 已经下线超过 1 分钟"
+
+      # CPU 使用率高
+      - alert: NodeCPUHigh
+        expr: 100 - (avg by(instance) (irate(node_cpu_seconds_total{mode="idle"}[5m])) * 100) > 80
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "CPU 使用率过高 (实例 {{ $labels.instance }})"
+          description: "CPU 使用率超过 80%"
+
+      # 内存使用率高
+      - alert: NodeMemoryHigh
+        expr: |
+          (1 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes)) * 100 > 80
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "内存使用率过高 (实例 {{ $labels.instance }})"
+          description: "内存使用率超过 80%"
+
+      # 磁盘使用率高
+      - alert: NodeDiskUsageHigh
+        expr: |
+          (1 - (node_filesystem_avail_bytes{fstype!~"tmpfs|overlay"} / node_filesystem_size_bytes{fstype!~"tmpfs|overlay"})) * 100 > 80
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "磁盘使用率过高 (实例 {{ $labels.instance }})"
+          description: "磁盘使用率超过 80%"
+
+      # 磁盘空间即将耗尽
+      - alert: NodeDiskSpaceLow
+        expr: |
+          (1 - (node_filesystem_avail_bytes{fstype!~"tmpfs|overlay"} / node_filesystem_size_bytes{fstype!~"tmpfs|overlay"})) * 100 > 90
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "磁盘空间即将耗尽 (实例 {{ $labels.instance }})"
+          description: "磁盘使用率超过 90%"

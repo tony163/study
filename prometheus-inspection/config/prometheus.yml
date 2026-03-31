@@ -1,0 +1,38 @@
+# Prometheus 主配置文件
+
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  external_labels:
+    monitor: 'prometheus-inspection'
+
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets:
+          - alertmanager:9093
+
+rule_files:
+  - "alert_rules.yml"
+
+scrape_configs:
+  # Prometheus 自监控
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+    metrics_path: /metrics
+    scheme: http
+
+  # Node Exporter
+  - job_name: 'node'
+    static_configs:
+      - targets: ['localhost:9100']
+    metrics_path: /metrics
+    scheme: http
+
+  # cAdvisor
+  - job_name: 'cadvisor'
+    static_configs:
+      - targets: ['localhost:8080']
+    metrics_path: /metrics
+    scheme: http
