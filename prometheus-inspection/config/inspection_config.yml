@@ -1,0 +1,91 @@
+# Prometheus 巡检配置
+
+# Prometheus 服务器地址
+prometheus:
+  url: "http://localhost:9090"
+  timeout: 30
+  # 如果需要认证，取消以下注释
+  # username: "admin"
+  # password: "password"
+
+# 巡检项目配置
+inspection:
+  # 检查间隔（秒）
+  interval: 300
+  
+  # 数据保留时间检查（天）
+  retention_days: 15
+  
+  # 需要检查的目标
+  targets:
+    - name: "prometheus"
+      job: "prometheus"
+    - name: "node-exporter"
+      job: "node"
+    - name: "cadvisor"
+      job: "cadvisor"
+
+# 健康检查阈值
+thresholds:
+  # 目标离线判定（秒）
+  target_down_seconds: 60
+  
+  # 抓取失败率警告阈值（%）
+  scrape_failure_rate_warning: 5
+  scrape_failure_rate_critical: 20
+  
+  # 评估队列延迟警告阈值（秒）
+  evaluation_delay_warning: 30
+  evaluation_delay_critical: 120
+  
+  # 规则评估持续时间警告阈值（秒）
+  rule_evaluation_duration_warning: 30
+  rule_evaluation_duration_critical: 120
+  
+  # TSDB 头部内存使用警告阈值（字节）
+  tsdb_head_chunks_warning: 1000000
+  tsdb_head_chunks_critical: 5000000
+  
+  # 查询延迟阈值（秒）
+  query_latency_warning: 5
+  query_latency_critical: 30
+
+# 报告配置
+report:
+  # 输出目录
+  output_dir: "reports"
+  
+  # 报告格式：html, json, csv, all
+  formats:
+    - html
+    - json
+  
+  # 是否包含详细指标
+  include_metrics: true
+  
+  # 邮件通知配置（可选）
+  email:
+    enabled: false
+    smtp_server: "smtp.example.com"
+    smtp_port: 587
+    username: "user@example.com"
+    password: "your_password"
+    recipients:
+      - "admin@example.com"
+  
+  # 钉钉通知配置（可选）
+  dingtalk:
+    enabled: false
+    webhook_url: "https://oapi.dingtalk.com/robot/send?access_token=YOUR_TOKEN"
+
+# 告警规则检查
+alert_rules:
+  # 检查告警规则文件
+  check_files:
+    - "config/alert_rules.yml"
+  
+  # 验证规则语法
+  validate_syntax: true
+  
+  # 检查是否有重复的告警名称
+  check_duplicates: true
