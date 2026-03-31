@@ -111,10 +111,10 @@ class HealthChecker:
     
     def check_rule_evaluation(self, rule_data: Dict) -> Dict[str, Any]:
         """
-        检查规则评估状态
+        检查规则评估状态（检查 alert_rules 中的所有规则项）
         
         Args:
-            rule_data: 规则评估数据
+            rule_data: 规则评估数据，包含 groups 和 rules 信息
             
         Returns:
             检查结果
@@ -123,7 +123,8 @@ class HealthChecker:
             'status': 'healthy',
             'issues': [],
             'warnings': [],
-            'metrics': rule_data
+            'metrics': {},
+            'rule_checks': []
         }
         
         # 检查评估延迟
@@ -144,6 +145,71 @@ class HealthChecker:
         failures = rule_data.get('evaluation_failures')
         if failures is not None and failures > 0:
             result['warnings'].append(f"规则评估失败次数：{failures}")
+        
+        # 检查所有告警规则项
+        groups = rule_data.get('groups', [])
+        total_rules = 0
+        active_alerts = 0
+        pending_alerts = 0
+        inactive_rules = 0
+        
+        for group in groups:
+            group_name = group.get('name', 'unknown')
+            rules = group.get('rules', [])
+            
+            for rule in rules:
+                total_rules += 1
+                rule_check = {
+                    'group': group_name,
+                    'rule_name': rule.get('name', 'unknown'),
+                    'rule_type': rule.get('type', 'alerting'),
+                    'state': rule.get('state', 'unknown'),
+                    'health': 'healthy',
+                    'issue': None
+                }
+                
+                # 检查规则状态
+                state = rule.get('state', '').lower()
+                if state == 'firing':
+                    active_alerts += 1
+                    rule_check['health'] = 'critical'
+                    rule_check['issue'] = f"告警正在触发：{rule.get('labels', {}).get('severity', 'unknown')} severity"
+                    result['issues'].append({
+                        'type': 'alert_firing',
+                        'group': group_name,
+                        'rule': rule.get('name'),
+                        'severity': rule.get('labels', {}).get('severity', 'unknown'),
+                        'value': rule.get('value'),
+                        'labels': rule.get('labels', {}),
+                        'annotations': rule.get('annotations', {})
+                    })
+                elif state == 'pending':
+                    pending_alerts += 1
+                    rule_check['health'] = 'warning'
+                    rule_check['issue'] = f"告警等待中 (for: {rule.get('duration', 0)}s)"
+                    result['warnings'].append({
+                        'type': 'alert_pending',
+                        'group': group_name,
+                        'rule': rule.get('name'),
+                        'duration': rule.get('duration', 0)
+                    })
+                else:
+                    inactive_rules += 1
+                
+                result['rule_checks'].append(rule_check)
+        
+        # 添加规则统计指标
+        result['metrics']['total_rules'] = total_rules
+        result['metrics']['active_alerts'] = active_alerts
+        result['metrics']['pending_alerts'] = pending_alerts
+        result['metrics']['inactive_rules'] = inactive_rules
+        result['metrics']['rule_groups'] = len(groups)
+        
+        # 根据活跃告警数量调整整体状态
+        if active_alerts > 0:
+            result['status'] = 'critical'
+        elif pending_alerts > 0 and result['status'] != 'critical':
+            result['status'] = 'warning'
         
         return result
     
